@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+research_memory.db
+chroma_db/
+*.egg-info/
+.venv/
