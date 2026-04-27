@@ -382,17 +382,33 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Generate the markdown report without sending email.",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force execution even if a report for today already exists.",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
     today = date.today()
+    
+    # Check if report already exists for today
+    filename = f"{today.isoformat()}_{slugify('daily ai research report')}.md"
+    output_dir = Path(args.output_dir)
+    output_path = output_dir / filename
+    
+    if output_path.exists() and not args.force:
+        print(f"[Skip] Report for today ({today.isoformat()}) already exists at: {output_path}")
+        print("Use --force to generate it again.")
+        return
+
     query = build_query(today)
     output_path = generate_report(
         query=query,
         online=args.online,
-        output_dir=Path(args.output_dir),
+        output_dir=output_dir,
         report_date=today,
     )
     print(f"[Report] Saved markdown report to: {output_path}")
