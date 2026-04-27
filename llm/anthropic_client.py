@@ -6,6 +6,9 @@ from llm.base import BaseLLMClient
 class AnthropicClient(BaseLLMClient):
     def __init__(self, model: str | None = None):
         self.model = model or LLM_MODEL
+        self.total_input_tokens = 0
+        self.total_output_tokens = 0
+        self.usage_log: list[dict] = []
         kwargs = {}
         if ANTHROPIC_API_KEY:
             # Session ingress tokens (sk-ant-si-*) use Bearer auth; regular keys use X-Api-Key
@@ -23,6 +26,14 @@ class AnthropicClient(BaseLLMClient):
             kwargs["tools"] = self.normalize_tools(tools)
 
         response = self.client.messages.create(**kwargs)
+        usage = getattr(response, "usage", None)
+        usage_info = {
+            "input_tokens": getattr(usage, "input_tokens", 0) if usage else 0,
+            "output_tokens": getattr(usage, "output_tokens", 0) if usage else 0,
+        }
+        self.total_input_tokens += usage_info["input_tokens"]
+        self.total_output_tokens += usage_info["output_tokens"]
+        self.usage_log.append(usage_info)
 
         text_content = ""
         tool_calls = []
@@ -43,6 +54,7 @@ class AnthropicClient(BaseLLMClient):
             "content": text_content,
             "tool_calls": tool_calls,
             "stop_reason": stop_reason_map.get(response.stop_reason, response.stop_reason),
+            "usage": usage_info,
         }
 
     def format_tool_result(self, tool_call_id: str, content: str) -> dict:

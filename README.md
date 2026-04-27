@@ -88,6 +88,61 @@ The search tool supports optional freshness controls:
 
 Make sure dependencies are installed with `pip install -r requirements.txt`.
 
+## Daily Email Report
+
+The repo includes a daily report job at `scripts/daily_ai_research_report.py`.
+It runs a fixed Senior AI Research Lead query, saves a markdown file under
+`results/daily/`, puts the report content in the email body, and attaches the
+same `.md` file using SMTP settings from `.env`.
+
+The daily query covers GenAI Ops, MLOps Platform/Infra,
+Deployment/Release Engineering, RAG/Data Quality, Cost/Performance Engineering,
+Production Reliability/Security, one deep technical concept, and one
+architecture design challenge.
+The job uses at most 3 research/tool iterations, then performs a final no-tools
+synthesis pass if needed so the email still contains a complete report.
+
+Add these email settings to `.env`:
+
+```bash
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your_email@example.com
+SMTP_PASSWORD=your_app_password
+SMTP_USE_TLS=true
+EMAIL_FROM=your_email@example.com
+EMAIL_TO=your_email@example.com
+```
+
+Keep real credentials only in `.env`. The repo ignores `.env`, `.env.*`, and
+common secret-file names; commit only placeholder values in `.env.example`.
+
+Run it once manually:
+
+```bash
+python scripts/daily_ai_research_report.py --online
+```
+
+To generate the file without emailing:
+
+```bash
+python scripts/daily_ai_research_report.py --online --no-email
+```
+
+On Windows, register a daily scheduled task:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/register_daily_report_task.ps1 -Time 11:00 -Online
+```
+
+Without `-Online`, the scheduled job will run in offline mode and will not
+perform web lookup.
+
+The scheduled task is configured with `StartWhenAvailable`, `WakeToRun`, and
+three retries at 60-minute intervals. If the laptop is asleep or hibernating and
+Windows can wake it, the report should run. If the laptop is fully shut down at
+11 AM, the task will run when Windows is next available.
+
 ## Provider Switching
 
 ```bash

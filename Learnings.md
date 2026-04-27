@@ -36,6 +36,10 @@ This document explains the internal architecture of the Research Agent and provi
 ### Evaluation (`eval/`)
 - **`run_eval.py`**: An automated testing script that runs the agent against predefined test cases in `test_cases.json` and scores the results.
 
+### Automation (`scripts/`)
+- **`daily_ai_research_report.py`**: Runs the fixed daily Senior AI Research Lead query across GenAI Ops, MLOps Platform/Infra, Deployment/Release Engineering, RAG/Data Quality, Cost/Performance, Production Reliability/Security, Deep Dive, and Design Challenge sections. It saves a markdown report under `results/daily/` and emails it using SMTP settings from `.env`.
+- **`register_daily_report_task.ps1`**: Registers the daily report script as a Windows Scheduled Task. Pass `-Online` when the job should use internet search.
+
 ---
 
 ## What happens when you run `python main.py "query"`?
@@ -72,3 +76,16 @@ The agent enters a loop (up to `MAX_ITERATIONS`):
 - **`LongTermMemory`** saves a snapshot of the conversation buffer so you can `--continue` later.
 - If the `--output` flag was used, the agent slugifies your query and saves the final report as a `.md` file in the `results/` directory.
 - The final answer is printed to your terminal.
+
+---
+
+## How the daily email scheduler works
+
+The daily report flow is separate from the interactive CLI:
+
+1. **`scripts/daily_ai_research_report.py`** builds the daily AI research query and replaces `{{Date}}` with today's date.
+2. It initializes the same LLM, memory, registry, and `ResearchAgent` stack used by `main.py`.
+3. It runs online only when called with `--online`; otherwise it remains offline like the main CLI.
+4. It writes the final markdown file to `results/daily/YYYY-MM-DD_daily_ai_research_report.md`.
+5. It emails that markdown file using `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `EMAIL_FROM`, and `EMAIL_TO` from `.env`.
+6. **`scripts/register_daily_report_task.ps1`** creates a Windows Scheduled Task that runs the report script every day at the configured time.
