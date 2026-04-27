@@ -26,7 +26,8 @@ class ResearchAgent:
 
         # Build memory context for system prompt
         memory_context = self._fetch_memory_context(task)
-        system_prompt = build_system_prompt(memory_context)
+        internet_enabled = getattr(self.registry, "internet_enabled", True)
+        system_prompt = build_system_prompt(memory_context, internet_enabled=internet_enabled)
 
         # Initialise short-term buffer with the user task if empty
         if self.short_term is not None:

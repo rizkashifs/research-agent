@@ -30,6 +30,10 @@ def parse_args():
         "--output", action="store_true",
         help="Save the final answer as a markdown file in the 'results' directory"
     )
+    parser.add_argument(
+        "--online", action="store_true",
+        help="Enable internet search for latest/current information"
+    )
     return parser.parse_args()
 
 
@@ -71,6 +75,11 @@ def main():
     elif args.fresh:
         print("[Memory] Starting fresh — ignoring all prior memory.\n")
 
+    if args.online:
+        print("[Mode] Online mode enabled - internet search is available.\n")
+    else:
+        print("[Mode] Offline mode enabled - use --online to enable internet search.\n")
+
     # --- Run agent ---
     try:
         llm = get_llm_client()
@@ -78,7 +87,7 @@ def main():
         print(f"\n[Error] {e}\n")
         sys.exit(1)
 
-    registry = ToolRegistry()
+    registry = ToolRegistry(internet_enabled=args.online)
     agent = ResearchAgent(
         llm_client=llm,
         registry=registry,

@@ -5,16 +5,16 @@ This document explains the internal architecture of the Research Agent and provi
 ## Project Structure & File Explanations
 
 ### Core Entry Point
-- **`main.py`**: The CLI entry point. It orchestrates the entire lifecycle: validating input, setting up memory, initializing the agent, running the query, validating output, and persisting session data.
+- **`main.py`**: The CLI entry point. It orchestrates the entire lifecycle: validating input, setting up memory, choosing offline/online mode, initializing the agent, running the query, validating output, and persisting session data. The agent is offline by default; `--online` enables internet search.
 
 ### Agent Logic (`agent/`)
 - **`agent.py`**: Contains the `ResearchAgent` class which implements the **ReAct (Reason + Act) loop**. It manages the iteration cycles, handles tool calls, and updates the state.
-- **`planner.py`**: Responsible for constructing the system and user prompts. It formats the context (searches, memory) into a structure the LLM understands.
+- **`planner.py`**: Responsible for constructing the system and user prompts. It formats the context (searches, memory, current date, and offline/online mode) into a structure the LLM understands.
 - **`state.py`**: Defines `AgentState` and `Step` dataclasses to track the agent's progress, thoughts, actions, and observations during a session.
 
 ### Tools (`tools/`)
-- **`registry.py`**: The central hub for all tools. It registers tool functions and provides their JSON schemas to the LLM.
-- **`search.py`**: Performs web searches using DuckDuckGo.
+- **`registry.py`**: The central hub for all tools. It registers tool functions and provides their JSON schemas to the LLM. It defaults to `internet_enabled=False`, so direct `ToolRegistry()` usage is offline unless explicitly enabled.
+- **`search.py`**: Performs web searches using DuckDuckGo when online mode is enabled. In offline mode, the registry keeps a `search` tool registered, but swaps in a disabled stub that tells the agent fresh web verification was not performed.
 - **`summarize.py`**: Uses a separate LLM call to condense long search results or documents.
 - **`save_note.py`**: Allows the agent to save specific findings into the long-term SQLite database.
 - **`recall.py`**: Uses the vector store to search through historical notes and memories.
@@ -44,6 +44,7 @@ Here is the step-by-step execution flow of the command:
 
 ### 1. Initialization & Input Guardrails
 - **`main.py`** starts and parses your query.
+- It checks whether `--online` was passed. Without it, offline mode remains active and internet search is disabled.
 - It calls **`guardrails/input_validator.py`** to ensure the query is valid.
 - It initializes **`LongTermMemory`** (SQLite) and creates a new `session_id`.
 
@@ -52,14 +53,14 @@ Here is the step-by-step execution flow of the command:
 
 ### 3. Agent & LLM Setup
 - **`llm/factory.py`** creates an LLM client (defaulting to Anthropic Claude).
-- **`tools/registry.py`** loads all available tools (Search, Summarize, Save Note, Recall).
+- **`tools/registry.py`** loads all available tools (Search, Summarize, Save Note, Recall). `main.py` passes `internet_enabled=args.online`, so web search is available only when `--online` is used.
 - The **`ResearchAgent`** is initialized with these components.
 
 ### 4. The ReAct Loop (The "Brain" at Work)
 The agent enters a loop (up to `MAX_ITERATIONS`):
 - **Step A: Plan/Thought**: The agent sends the current conversation history to the LLM. The LLM generates a "Thought" about what to do next.
 - **Step B: Action**: If the LLM decides it needs information, it returns a "Tool Call" (e.g., `search(query="RAG vs fine-tuning")`).
-- **Step C: Observation**: The agent executes the tool in **`tools/search.py`**, gets the results, and adds them to the conversation as an "Observation".
+- **Step C: Observation**: The agent executes the requested tool and adds the result to the conversation as an "Observation". In offline mode, a `search` call returns a clear disabled message. In online mode, `search` runs through **`tools/search.py`** and returns DuckDuckGo results with URLs and search time metadata.
 - **Step D: Repeat**: The loop continues. The agent might "Summarize" the search results or "Save Note" for future use.
 
 ### 5. Final Answer Generation
