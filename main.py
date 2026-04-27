@@ -2,6 +2,8 @@
 """CLI entry point for the Research Agent."""
 import argparse
 import sys
+import os
+import re
 
 from guardrails.input_validator import validate_query
 from guardrails.output_validator import validate_output, extract_search_urls
@@ -24,7 +26,19 @@ def parse_args():
         "--fresh", action="store_true",
         help="Ignore memory, start completely clean"
     )
+    parser.add_argument(
+        "--output", action="store_true",
+        help="Save the final answer as a markdown file in the 'results' directory"
+    )
     return parser.parse_args()
+
+
+def slugify(text: str) -> str:
+    """Convert a string to a filesystem-friendly slug."""
+    text = text.lower()
+    text = re.sub(r'[^\w\s-]', '', text)
+    text = re.sub(r'[-\s]+', '_', text).strip('_')
+    return text or "research_result"
 
 
 def main():
@@ -87,6 +101,20 @@ def main():
     print("="*60)
     print(final_answer)
     print()
+
+    # --- Save to file ---
+    if args.output:
+        try:
+            output_dir = "results"
+            os.makedirs(output_dir, exist_ok=True)
+            filename = f"{slugify(query)}.md"
+            filepath = os.path.join(output_dir, filename)
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(f"# Research Task: {query}\n\n")
+                f.write(final_answer)
+            print(f"[File] Final answer saved to: {filepath}\n")
+        except Exception as e:
+            print(f"[Error] Could not save to file: {e}\n")
 
 
 if __name__ == "__main__":

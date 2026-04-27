@@ -69,4 +69,5 @@ The agent enters a loop (up to `MAX_ITERATIONS`):
 ### 6. Output Guardrails & Persistence
 - **`guardrails/output_validator.py`** scans the final answer to ensure it's high quality and includes necessary citations.
 - **`LongTermMemory`** saves a snapshot of the conversation buffer so you can `--continue` later.
+- If the `--output` flag was used, the agent slugifies your query and saves the final report as a `.md` file in the `results/` directory.
 - The final answer is printed to your terminal.

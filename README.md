@@ -40,6 +40,12 @@ Edit `.env` and configure your preferences (see `CLAUDE.md` for all options). Mi
 python main.py "What is the difference between RAG and fine-tuning?"
 ```
 
+### 6. Save output to a file (Optional)
+You can save the final report automatically to the `results/` directory:
+```bash
+python main.py "Your query" --output
+```
+
 ## Features
 
 - **ReAct loop** with configurable iteration cap
