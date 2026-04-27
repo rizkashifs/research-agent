@@ -4,11 +4,39 @@ A local Research Agent built from scratch in raw Python — no LangChain, no Lla
 
 Covers agent fundamentals hands-on: tool calling, memory, state management, planning, retrieval, evaluation, and guardrails.
 
-## Quick Start
+## Installation & Setup
 
+### 1. Clone the repository
+```bash
+git clone https://github.com/rizkashifs/research-agent.git
+cd research-agent
+```
+
+### 2. Create and activate a virtual environment
+```bash
+# Windows
+python -m venv venv
+.\venv\Scripts\activate
+
+# macOS/Linux
+python3 -m venv venv
+source venv/bin/activate
+```
+
+### 3. Install dependencies
 ```bash
 pip install -r requirements.txt
-export ANTHROPIC_API_KEY=your_key_here
+```
+
+### 4. Configure environment variables
+Copy the example environment file and add your API keys:
+```bash
+cp .env.example .env
+```
+Edit `.env` and configure your preferences (see `CLAUDE.md` for all options). Minimum requirement is an API key for your chosen provider (e.g., `ANTHROPIC_API_KEY`).
+
+### 5. Run the Research Agent
+```bash
 python main.py "What is the difference between RAG and fine-tuning?"
 ```
 
