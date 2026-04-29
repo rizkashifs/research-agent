@@ -29,26 +29,48 @@ from llm.factory import get_llm_client
 
 
 REPORT_QUERY_TEMPLATE = """\
-Act as my Senior AI Research Lead. Today is {{Date}}. Provide a high-signal report on:
+Act as my Senior AI Research Lead. Today is {{Date}}.
 
-Run compactly: use at most 3 web searches total, save only one concise note, and complete the final report within 3 agent iterations.
+You are writing my daily 5-minute briefing. I am an MLOps and GenAI architect.
+Hard constraints:
+- Total report must be UNDER 520 words. I read this every morning — if it is long I stop reading it.
+- Use tight bullet points, not paragraphs. No section intros, no fluff.
+- Every sentence must carry a concrete signal or decision implication.
+- Search budget: at most 3 web searches, max_results=3 each, timelimit="w" for freshness.
+- If a section has no strong signal today, write exactly: "No strong signal today."
 
-GenAI Ops: One practical pattern for agentic orchestration, LLM evaluation, agent observability, or prompt/retrieval testing.
+---
 
-MLOps Platform/Infra: One major update or practical tradeoff involving Vertex AI, SageMaker, Databricks, MLflow, Kubeflow, Ray, Airflow, Kubernetes, feature stores, model registries, serving stacks, or experiment tracking.
+## What Just Shipped
+3 bullets max. Model releases, SDK/library version bumps, and tool launches from this week.
+Format: **[Name vX.X / release name]** — one sentence: what changed and the one architectural implication.
+Skip anything that is purely marketing with no engineering consequence.
 
-Deployment/Release Engineering: One useful pattern for model/prompt CI/CD, canary rollout, shadow testing, rollback, environment promotion, model registry gates, or reproducible pipelines.
+## Model & Research Signal
+2 bullets. One: a model or capability development that concretely changes a cost, latency, quality, or build-vs-buy tradeoff you make today. Two: one research technique that has crossed from paper to production-readiness — state the specific decision it affects.
 
-RAG/Data Quality: One practical signal on retrieval quality, data contracts, chunking/indexing, reranking, embedding/version drift, freshness SLAs, or knowledge-base governance.
+## MLOps Practice
+2 bullets. One shifting practice in how teams evaluate, deploy, monitor, or version ML/GenAI systems.
+Focus on the workflow decision, not the tool. What changed about how practitioners approach this step?
+Cover areas like: eval pipelines, model/prompt CI-CD, registry promotion gates, deployment patterns, pipeline contracts, drift alerting, observability, serving topology.
+Do NOT list tool names as the signal — the practice is the signal.
 
-Cost/Performance Engineering: One concrete update or tactic for latency, inference cost, caching, batching, model routing, quantization, GPU/serverless tradeoffs, or evaluation cost control.
+## Data Science Signal
+2 bullets. One practical development from: fine-tuning techniques (LoRA/QLoRA/GRPO/DPO), synthetic data generation, dataset curation, evaluation science, new benchmarks and what they expose, or feature engineering advances.
+State what a practitioner can apply or decide differently this week.
 
-Production Reliability/Security: One production concern such as drift detection, data leakage, PII handling, access control, prompt injection, eval regressions, incident response, SLOs, or observability. Avoid regulatory summaries unless they directly change an engineering decision.
+## Concept of the Day
+6–8 sentences on one evergreen MLOps or GenAI architecture concept.
+Use this structure: what it is (1 sentence) → how it works in practice (2 sentences) → where it silently fails in production and why (2 sentences) → the one concrete mitigation (1–2 sentences).
+Rotate through: feature skew, embedding drift, prompt versioning, shadow deployment, model registry gates, online/offline parity, KV-cache reuse, inference autoscaling, eval regression, retrieval permission drift, data contract violations, reranker latency budget.
 
-Deep Dive: A 2-sentence technical breakdown of one evergreen MLOps or GenAI architecture concept like feature skew, online/offline parity, model registry gates, embedding drift, CI/CD for prompts, shadow deployments, or inference autoscaling.
+## Design Challenge
+3–4 sentences. One architecture question grounded in today's signals.
+State: the system context, the specific constraint, and the failure mode to defend against.
+No answer — this is for me to reason through.
 
-Design Challenge: One thought experiment question based on today's news to test my architecture skills.
-Constraint: No marketing fluff or listicles-focus on scalability, security, and technical feasibility.
+---
+Word budget: under 520 words total across all six sections.
 """
 
 
@@ -89,18 +111,18 @@ def synthesize_from_steps(llm, query: str, state) -> str:
         if step.action == "final_answer":
             continue
         observations.append(
-            "Action: "
-            f"{step.action}({step.action_input})\n"
-            f"Observation: {step.observation[:1800]}"
+            f"Action: {step.action}({step.action_input})\n"
+            f"Observation: {step.observation[:1500]}"
         )
     evidence = "\n\n---\n\n".join(observations)
     prompt = (
-        "Write the final daily AI research report from the evidence below. "
-        "Do not call tools. Keep it concise but useful for an MLOps and GenAI architect. "
-        "Include these sections: GenAI Ops, MLOps Platform/Infra, "
-        "Deployment/Release Engineering, RAG/Data Quality, Cost/Performance Engineering, "
-        "Production Reliability/Security, Deep Dive, Design Challenge.\n\n"
-        f"Original request:\n{query}\n\n"
+        "Write the final daily AI research briefing from the evidence below. "
+        "Do not call tools. Under 520 words total. Bullet points only — no paragraphs. "
+        "Include exactly these six sections: "
+        "What Just Shipped, Model & Research Signal, MLOps Practice, "
+        "Data Science Signal, Concept of the Day, Design Challenge. "
+        "If a section has no evidence, write 'No strong signal today.' "
+        "Every bullet must carry a concrete decision implication for an MLOps/GenAI architect.\n\n"
         f"Evidence gathered:\n{evidence}"
     )
     response = llm.chat(messages=[{"role": "user", "content": prompt}], tools=None)
@@ -120,45 +142,36 @@ def fallback_report_from_steps(state, report_date: date) -> str:
     searches = [s for s in state.steps if s.action == "search"]
     summaries = [s for s in state.steps if s.action == "summarize"]
     recalls = [s for s in state.steps if s.action == "recall"]
-    notes = [s for s in state.steps if s.action == "save_note"]
 
-    def bullets(steps, limit=3):
+    def bullets(steps, limit=2):
         lines = []
         for step in steps[:limit]:
-            query = step.action_input.get("query") or step.action_input.get("topic") or step.action
-            observation = " ".join(step.observation.split())
-            lines.append(f"- **{query}**: {observation[:420]}")
-        return "\n".join(lines) if lines else "- No strong signal captured in this run."
+            q = step.action_input.get("query") or step.action_input.get("topic") or step.action
+            obs = " ".join(step.observation.split())
+            lines.append(f"- **{q}**: {obs[:380]}")
+        return "\n".join(lines) if lines else "- No strong signal today."
 
     return f"""\
-# AI Research Report | {report_date.isoformat()}
+# Daily AI Research Report | {report_date.isoformat()}
 
-## GenAI Ops
-{bullets(recalls[:1] + searches[:1], limit=2)}
+## What Just Shipped
+{bullets(searches[:1] + recalls[:1])}
 
-## MLOps Platform/Infra
-{bullets(searches[1:2] + recalls[1:2], limit=2)}
+## Model & Research Signal
+{bullets(searches[1:2] + summaries[:1])}
 
-## Deployment/Release Engineering
-- Use model registry gates, canary/shadow evaluation, and rollback metadata as the default release path for models, prompts, and retrieval pipelines. This run did not produce a dedicated release-engineering final answer before the iteration cap, so treat this as the architectural fallback.
+## MLOps Practice
+- **Eval-as-CI**: Treat prompt/model evaluation as a blocking CI gate — failing evals prevent promotion the same way failing unit tests prevent a code merge. Silent quality regressions are the primary failure mode in production GenAI systems.
+- **Registry-first deployment**: Every model, prompt version, and embedding checkpoint should be an immutable artifact in a registry with a promotion policy before reaching production.
 
-## RAG/Data Quality
-{bullets(recalls[2:3] + searches[2:3], limit=2)}
+## Data Science Signal
+{bullets(summaries[:1] + searches[2:3])}
 
-## Cost/Performance Engineering
-{bullets(summaries[:1] + searches[1:2], limit=2)}
-
-## Production Reliability/Security
-- Prioritize drift alerts, access-control tests, prompt-injection regression tests, and incident runbooks over broad regulatory summaries unless the rule changes an engineering decision.
-
-## Deep Dive
-- **Model/prompt release gates**: Treat prompts, embedding models, rerankers, and model versions as deployable artifacts with immutable versions and eval thresholds. The practical failure mode is not only bad output quality; it is silent regressions in latency, retrieval permissions, and rollback reproducibility.
+## Concept of the Day
+**Embedding drift** is the gradual divergence between the distribution of vectors in your index and the distribution your retrieval queries now produce — caused by model updates, domain shift, or data staleness. It manifests as silent precision degradation: the retrieval pipeline keeps returning results, but relevance quietly drops. In production, it is rarely caught by latency or error-rate monitors because the system is technically healthy. Mitigation: track cosine similarity distributions over time between a fixed query probe set and their top-k results; alert when the mean similarity drops more than a threshold across a rolling window.
 
 ## Design Challenge
-- You are deploying a multi-tenant RAG assistant with model registry promotion, cross-encoder reranking, and cost-sensitive inference routing. Where do you place the canary gate so it catches retrieval permission regressions, latency spikes, and answer-quality drift before full production rollout?
-
-## Evidence Captured
-{bullets(searches + summaries + notes, limit=6)}
+You are running a multi-tenant RAG system where each tenant has isolated document collections and separate embedding models at different version levels. A planned embedding model upgrade improves retrieval quality by 12% on your eval set but requires re-indexing all tenant collections. How do you roll this out so that you can measure per-tenant quality delta, roll back individual tenants without affecting others, and avoid a full re-index outage — while keeping retrieval latency within SLA during the migration?
 """
 
 
