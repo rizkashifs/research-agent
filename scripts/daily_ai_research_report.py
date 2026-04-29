@@ -28,6 +28,25 @@ from tools.save_note import set_session_id
 from llm.factory import get_llm_client
 
 
+REPORT_SYSTEM_PROMPT_TEMPLATE = """\
+You are a senior AI research analyst doing a daily news scan for an MLOps and GenAI architect.
+Today is {report_date}. Internet search is ON — use it.
+
+Your ONLY job is to run 3 targeted web searches across different topic clusters, then write the
+structured briefing directly. Do not call recall() or save_note() — this is a time-sensitive
+current-events scan, not a general research session. Do not call summarize() separately;
+synthesize inline when writing the final report.
+
+Search strategy — run all 3 in the first iteration, each with max_results=3 and timelimit="w":
+  1. Latest AI/LLM model releases, SDK updates, and research-to-production crossovers this week
+  2. MLOps engineering practice news: deployment patterns, eval pipelines, observability, data science techniques this week
+  3. GenAI tools, agent frameworks, fine-tuning/training developments, and benchmark results this week
+
+After the searches complete, write the final report immediately in the next iteration.
+Do not add extra tool calls between the searches and the final answer.
+"""
+
+
 REPORT_QUERY_TEMPLATE = """\
 Act as my Senior AI Research Lead. Today is {{Date}}.
 
@@ -185,12 +204,16 @@ def generate_report(query: str, online: bool, output_dir: Path, report_date: dat
     stm = ShortTermMemory(max_messages=200)
     llm = get_llm_client()
     registry = ToolRegistry(internet_enabled=online)
+    report_system_prompt = REPORT_SYSTEM_PROMPT_TEMPLATE.format(
+        report_date=report_date.isoformat()
+    )
     agent = ResearchAgent(
         llm_client=llm,
         registry=registry,
         short_term=stm,
         long_term=ltm,
         max_iterations=3,
+        system_prompt_override=report_system_prompt,
     )
 
     state = agent.run(query)
