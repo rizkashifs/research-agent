@@ -37,13 +37,16 @@ structured briefing directly. Do not call recall() or save_note() — this is a 
 current-events scan, not a general research session. Do not call summarize() separately;
 synthesize inline when writing the final report.
 
-Search strategy — run all 3 in the first iteration, each with max_results=3 and timelimit="w":
-  1. Latest AI/LLM model releases, SDK updates, and research-to-production crossovers this week
-  2. MLOps engineering practice news: deployment patterns, eval pipelines, observability, data science techniques this week
-  3. GenAI tools, agent frameworks, fine-tuning/training developments, and benchmark results this week
+Search strategy — run all 3 searches in the first iteration, each with max_results=3 and timelimit="w".
+Make the queries specific to TODAY's date ({report_date}) to maximise freshness:
+  1. "AI LLM model release SDK update {report_date}"
+  2. "MLOps GenAI engineering deployment eval observability {report_date}"
+  3. "machine learning fine-tuning benchmark data science {report_date}"
 
 After the searches complete, write the final report immediately in the next iteration.
 Do not add extra tool calls between the searches and the final answer.
+
+{yesterday_context}\
 """
 
 
@@ -96,6 +99,29 @@ Word budget: under 520 words total across all six sections.
 HAIKU_45_INPUT_PER_MILLION = 1.00
 HAIKU_45_OUTPUT_PER_MILLION = 5.00
 INCOMPLETE_WARNING = "[Warning: answer may be incomplete"
+
+
+def load_yesterday_context(output_dir: Path, report_date: date) -> str:
+    from datetime import timedelta
+    yesterday = report_date - timedelta(days=1)
+    filename = f"{yesterday.isoformat()}_{slugify('daily ai research report')}.md"
+    yesterday_path = output_dir / filename
+    if not yesterday_path.exists():
+        return ""
+    try:
+        content = yesterday_path.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    lines = [l for l in content.splitlines() if l.startswith("## ") or l.startswith("- **")]
+    if not lines:
+        return ""
+    summary = "\n".join(lines[:20])
+    return (
+        "IMPORTANT — Yesterday's report already covered the following topics and items. "
+        "Do NOT repeat these. Find different signals today:\n"
+        + summary
+        + "\n\n"
+    )
 
 
 def build_query(report_date: date) -> str:
@@ -204,8 +230,10 @@ def generate_report(query: str, online: bool, output_dir: Path, report_date: dat
     stm = ShortTermMemory(max_messages=200)
     llm = get_llm_client()
     registry = ToolRegistry(internet_enabled=online)
+    yesterday_context = load_yesterday_context(output_dir, report_date)
     report_system_prompt = REPORT_SYSTEM_PROMPT_TEMPLATE.format(
-        report_date=report_date.isoformat()
+        report_date=report_date.isoformat(),
+        yesterday_context=yesterday_context,
     )
     agent = ResearchAgent(
         llm_client=llm,
