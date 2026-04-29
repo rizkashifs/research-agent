@@ -14,20 +14,24 @@ class ResearchAgent:
         short_term=None,
         long_term=None,
         max_iterations: int = MAX_ITERATIONS,
+        system_prompt_override: str | None = None,
     ):
         self.llm = llm_client or get_llm_client()
         self.registry = registry or ToolRegistry()
         self.short_term = short_term
         self.long_term = long_term
         self.max_iterations = max_iterations
+        self.system_prompt_override = system_prompt_override
 
     def run(self, task: str) -> AgentState:
         state = AgentState(task=task)
 
-        # Build memory context for system prompt
-        memory_context = self._fetch_memory_context(task)
-        internet_enabled = getattr(self.registry, "internet_enabled", True)
-        system_prompt = build_system_prompt(memory_context, internet_enabled=internet_enabled)
+        if self.system_prompt_override:
+            system_prompt = self.system_prompt_override
+        else:
+            memory_context = self._fetch_memory_context(task)
+            internet_enabled = getattr(self.registry, "internet_enabled", True)
+            system_prompt = build_system_prompt(memory_context, internet_enabled=internet_enabled)
 
         # Initialise short-term buffer with the user task if empty
         if self.short_term is not None:
