@@ -29,21 +29,24 @@ from llm.factory import get_llm_client
 
 
 REPORT_SYSTEM_PROMPT_TEMPLATE = """\
-You are a senior AI research analyst doing a daily news scan for an MLOps and GenAI architect.
+You are a senior ML educator and AI research analyst writing a daily briefing for an MLOps and \
+Data Science architect who also works with GenAI/LLMs/Agentic AI.
 Today is {report_date}. Internet search is ON — use it.
 
-Your ONLY job is to run 3 targeted web searches across different topic clusters, then write the
-structured briefing directly. Do not call recall() or save_note() — this is a time-sensitive
-current-events scan, not a general research session. Do not call summarize() separately;
-synthesize inline when writing the final report.
+Your job has two parts:
+1. Run 3 targeted web searches to gather today's news signals (for What's New).
+2. Write a learning-first briefing: the Concept of the Day, Deployment Practice, and Design \
+Challenge come from your deep knowledge — grounded in today's signals where relevant, but not \
+limited to them. These sections must teach something concrete and memorable every day.
 
-Search strategy — run all 3 searches in the first iteration, each with max_results=3 and timelimit="w".
-Make the queries specific to TODAY's date ({report_date}) to maximise freshness:
-  1. "AI LLM model release SDK update {report_date}"
-  2. "MLOps GenAI engineering deployment eval observability {report_date}"
-  3. "machine learning fine-tuning benchmark data science {report_date}"
+Do not call recall() or save_note(). Do not call summarize() separately; synthesize inline.
 
-After the searches complete, write the final report immediately in the next iteration.
+Search strategy — run all 3 searches in the first iteration, each with max_results=3 and timelimit="w":
+  1. "AI LLM GenAI model release tool update {report_date}"
+  2. "MLOps data science ML deployment monitoring practice {report_date}"
+  3. "machine learning research benchmark fine-tuning statistics {report_date}"
+
+After the searches complete, write the full report in the next iteration.
 Do not add extra tool calls between the searches and the final answer.
 
 {yesterday_context}\
@@ -51,48 +54,75 @@ Do not add extra tool calls between the searches and the final answer.
 
 
 REPORT_QUERY_TEMPLATE = """\
-Act as my Senior AI Research Lead. Today is {{Date}}.
+Act as my Senior ML Educator and Research Lead. Today is {{Date}}.
 
-You are writing my daily 5-minute briefing. I am an MLOps and GenAI architect.
+I am an MLOps and Data Science architect with focus also on GenAI/LLMs/Agentic AI.
+My primary goal is to learn something every day — conceptually and operationally.
+Staying current on news is secondary.
+
 Hard constraints:
-- Total report must be UNDER 520 words. I read this every morning — if it is long I stop reading it.
-- Use tight bullet points, not paragraphs. No section intros, no fluff.
-- Every sentence must carry a concrete signal or decision implication.
-- Search budget: at most 3 web searches, max_results=3 each, timelimit="w" for freshness.
-- If a section has no strong signal today, write exactly: "No strong signal today."
+- Total report UNDER 520 words. If it is long I stop reading it.
+- Tight bullet points, not paragraphs. No section intros, no fluff.
+- Every sentence carries a concrete signal, learning point, or decision implication.
+- Search budget: at most 3 web searches, max_results=3 each, timelimit="w".
+- If What's New has no strong signal, write: "No strong signal today."
 
 ---
 
-## What Just Shipped
-3 bullets max. Model releases, SDK/library version bumps, and tool launches from this week.
-Format: **[Name vX.X / release name]** — one sentence: what changed and the one architectural implication.
-Skip anything that is purely marketing with no engineering consequence.
-
-## Model & Research Signal
-2 bullets. One: a model or capability development that concretely changes a cost, latency, quality, or build-vs-buy tradeoff you make today. Two: one research technique that has crossed from paper to production-readiness — state the specific decision it affects.
-
-## MLOps Practice
-2 bullets. One shifting practice in how teams evaluate, deploy, monitor, or version ML/GenAI systems.
-Focus on the workflow decision, not the tool. What changed about how practitioners approach this step?
-Cover areas like: eval pipelines, model/prompt CI-CD, registry promotion gates, deployment patterns, pipeline contracts, drift alerting, observability, serving topology.
-Do NOT list tool names as the signal — the practice is the signal.
-
-## Data Science Signal
-2 bullets. One practical development from: fine-tuning techniques (LoRA/QLoRA/GRPO/DPO), synthetic data generation, dataset curation, evaluation science, new benchmarks and what they expose, or feature engineering advances.
-State what a practitioner can apply or decide differently this week.
+## What's New
+5 bullets max. Covers all domains: model/tool releases, MLOps practice shifts, DS/ML research
+crossing into production. Format: **[thing]** — signal + one decision implication.
+Skip pure marketing. Include classical ML, data engineering, LLMs, and MLOps tooling.
 
 ## Concept of the Day
-6–8 sentences on one evergreen MLOps or GenAI architecture concept.
-Use this structure: what it is (1 sentence) → how it works in practice (2 sentences) → where it silently fails in production and why (2 sentences) → the one concrete mitigation (1–2 sentences).
-Rotate through: feature skew, embedding drift, prompt versioning, shadow deployment, model registry gates, online/offline parity, KV-cache reuse, inference autoscaling, eval regression, retrieval permission drift, data contract violations, reranker latency budget.
+One concept chosen from the rotation below. Use this exact structure:
+- **What it is**: 1 sentence, plain definition — no jargon unless defined.
+- **How it works**: 2 sentences, concrete example with real numbers or a before/after scenario.
+- **Where it silently fails**: 2 sentences — specific production failure mode and why it is hard to catch.
+- **Decision rule**: 1 sentence — a threshold, heuristic, or "if X then Y" the reader can apply immediately.
+
+Rotate across these three domains equally — do not favour GenAI:
+- Classical ML/stats: bias-variance tradeoff, model calibration, feature leakage, data leakage, \
+train-test contamination, overfitting signals, class imbalance, A/B test design, statistical power, \
+type I/II errors, p-value traps, confidence intervals, covariate shift, concept drift, \
+distribution shift detection, cross-validation design, regularisation (L1/L2/elastic net), learning curves.
+- DS practice: train-serve skew, feature engineering patterns, target encoding pitfalls, \
+feature store design, data contracts, schema drift, label noise, dataset versioning, \
+EDA failure modes, outlier handling, missing data strategies, stratified sampling.
+- MLOps/GenAI: shadow deployment mechanics, canary rollout, model registry promotion gates, \
+blue-green model swap, eval regression, embedding drift, RAG retrieval quality, prompt versioning, \
+agentic loop failure modes, context window management, KV-cache reuse, inference autoscaling, \
+cost attribution, online/offline parity, reranker latency budget.
+
+## Deployment Practice
+One operational pattern — something a practitioner wires up or decides during deployment or operations.
+Structure:
+- **Pattern**: 1 sentence — what it is.
+- **When to use it**: 1 sentence — the trigger condition or signal that calls for this pattern.
+- **What breaks without it**: 1 sentence — the specific, concrete failure mode.
+- **How to implement it**: 1–2 sentences — one detail that makes it work in practice (a threshold, \
+a tool contract, a data structure, a decision rule).
+
+Rotate through: shadow deployment, canary release, blue-green model swap, model promotion gate, \
+feature flag for model variants, rollback strategy, serving topology design, request batching, \
+latency budget allocation, per-call cost attribution, pipeline contract enforcement, \
+data drift alerting, experiment tracking discipline, training pipeline idempotency, \
+load testing ML endpoints, A/B test instrumentation, SLA definition for ML systems.
 
 ## Design Challenge
-3–4 sentences. One architecture question grounded in today's signals.
-State: the system context, the specific constraint, and the failure mode to defend against.
-No answer — this is for me to reason through.
+3–4 sentences. One architecture problem. Rotate domains: classical ML system, data pipeline, \
+GenAI/LLM, MLOps infrastructure, DS workflow — do not default to LLMs.
+State: system context + one concrete numeric constraint (latency, dataset size, cost, team size) \
++ the specific decision to make + the failure mode to defend against.
+End with **Consider:** followed by 2–3 pointed hints that scaffold thinking without giving the answer.
 
 ---
-Word budget: under 520 words total across all six sections.
+
+**Rule of Thumb:** One practitioner heuristic relevant to today's concept or challenge — \
+one sentence, something concrete enough to remember and repeat.
+
+---
+Word budget: under 520 words total.
 """
 
 
@@ -161,13 +191,19 @@ def synthesize_from_steps(llm, query: str, state) -> str:
         )
     evidence = "\n\n---\n\n".join(observations)
     prompt = (
-        "Write the final daily AI research briefing from the evidence below. "
-        "Do not call tools. Under 520 words total. Bullet points only — no paragraphs. "
-        "Include exactly these six sections: "
-        "What Just Shipped, Model & Research Signal, MLOps Practice, "
-        "Data Science Signal, Concept of the Day, Design Challenge. "
-        "If a section has no evidence, write 'No strong signal today.' "
-        "Every bullet must carry a concrete decision implication for an MLOps/GenAI architect.\n\n"
+        "Write the final daily briefing from the evidence below for an MLOps and Data Science "
+        "architect who also works with GenAI/LLMs. Do not call tools. Under 520 words total. "
+        "Include exactly these four sections plus a closing Rule of Thumb line:\n"
+        "1. What's New — 5 bullets max, all domains, format: **[thing]** — signal + implication.\n"
+        "2. Concept of the Day — one concept with: What it is / How it works (example with numbers) "
+        "/ Where it silently fails / Decision rule.\n"
+        "3. Deployment Practice — one operational pattern with: Pattern / When to use it "
+        "/ What breaks without it / How to implement it.\n"
+        "4. Design Challenge — system context + numeric constraint + decision + failure mode + "
+        "Consider: 2–3 hints. Rotate domains across classical ML, data pipeline, MLOps, GenAI.\n"
+        "End with: **Rule of Thumb:** one memorable practitioner heuristic.\n"
+        "If What's New has no evidence write 'No strong signal today.' "
+        "Every line must carry a concrete learning point or decision implication.\n\n"
         f"Evidence gathered:\n{evidence}"
     )
     response = llm.chat(messages=[{"role": "user", "content": prompt}], tools=None)
@@ -199,24 +235,29 @@ def fallback_report_from_steps(state, report_date: date) -> str:
     return f"""\
 # Daily AI Research Report | {report_date.isoformat()}
 
-## What Just Shipped
-{bullets(searches[:1] + recalls[:1])}
-
-## Model & Research Signal
-{bullets(searches[1:2] + summaries[:1])}
-
-## MLOps Practice
-- **Eval-as-CI**: Treat prompt/model evaluation as a blocking CI gate — failing evals prevent promotion the same way failing unit tests prevent a code merge. Silent quality regressions are the primary failure mode in production GenAI systems.
-- **Registry-first deployment**: Every model, prompt version, and embedding checkpoint should be an immutable artifact in a registry with a promotion policy before reaching production.
-
-## Data Science Signal
-{bullets(summaries[:1] + searches[2:3])}
+## What's New
+{bullets(searches[:2] + recalls[:1])}
 
 ## Concept of the Day
-**Embedding drift** is the gradual divergence between the distribution of vectors in your index and the distribution your retrieval queries now produce — caused by model updates, domain shift, or data staleness. It manifests as silent precision degradation: the retrieval pipeline keeps returning results, but relevance quietly drops. In production, it is rarely caught by latency or error-rate monitors because the system is technically healthy. Mitigation: track cosine similarity distributions over time between a fixed query probe set and their top-k results; alert when the mean similarity drops more than a threshold across a rolling window.
+- **What it is**: Train-serve skew is the divergence between the feature distribution seen during model training and the distribution of the same features at serving time.
+- **How it works**: A model trained on batch-aggregated features (e.g. 7-day rolling mean computed offline) receives real-time point-in-time values at inference — the two pipelines compute the same feature name but with different logic or timing windows, producing systematically different inputs. A fraud model trained on monthly average transaction velocity will underestimate risk for a new account with 3 days of history.
+- **Where it silently fails**: The model and serving pipeline both appear healthy — no errors, no latency spikes. Prediction quality degrades silently because the model has never seen the true inference-time distribution. Standard monitoring (error rate, latency, null rate) does not catch it.
+- **Decision rule**: If your training pipeline and serving pipeline compute the same feature independently, they will diverge — enforce a single feature definition served from a feature store used by both.
+
+## Deployment Practice
+- **Pattern**: Shadow deployment runs a new model version in parallel with production, receiving the same live traffic, but its outputs are logged rather than served to users.
+- **When to use it**: Before any model swap where you lack sufficient offline eval coverage of production traffic distribution — especially on skewed or long-tail inputs.
+- **What breaks without it**: You discover latency regressions, edge-case failures, or cost overruns only after the model is live, when rollback is expensive and user-visible.
+- **How to implement it**: Route 100% of requests to both models; gate the shadow path behind a feature flag; compare output distributions (not just accuracy) and p99 latency over 24–48 hours before promoting.
 
 ## Design Challenge
-You are running a multi-tenant RAG system where each tenant has isolated document collections and separate embedding models at different version levels. A planned embedding model upgrade improves retrieval quality by 12% on your eval set but requires re-indexing all tenant collections. How do you roll this out so that you can measure per-tenant quality delta, roll back individual tenants without affecting others, and avoid a full re-index outage — while keeping retrieval latency within SLA during the migration?
+You are deploying a new gradient-boosted model to replace a 2-year-old logistic regression on a customer churn prediction pipeline. The new model improves AUC by 6% on your holdout set (80k rows, 18 months of data). Inference runs in batch overnight. Your constraint: rollback must complete within one pipeline cycle (24 hours) and you cannot re-train within that window. The failure mode to defend against: the new model performs worse on a customer segment that is underrepresented in training data but high-value in production.
+
+**Consider:** How do you slice your holdout eval to surface segment-level performance before promoting? What artefacts do you version so rollback is a config change, not a redeploy? How do you monitor for the segment degradation signal in the first 72 hours post-swap?
+
+---
+
+**Rule of Thumb:** A 6% AUC lift on a global holdout means nothing if it comes from the majority class — always check segment-level performance before promoting a model that serves a heterogeneous population.
 """
 
 
