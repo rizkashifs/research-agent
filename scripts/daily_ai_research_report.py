@@ -61,7 +61,7 @@ My primary goal is to learn something every day — conceptually and operational
 Staying current on news is secondary.
 
 Hard constraints:
-- Total report UNDER 520 words. If it is long I stop reading it.
+- Total report UNDER 570 words. If it is long I stop reading it.
 - Tight bullet points, not paragraphs. No section intros, no fluff.
 - Every sentence carries a concrete signal, learning point, or decision implication.
 - Search budget: at most 3 web searches, max_results=3 each, timelimit="w".
@@ -70,7 +70,7 @@ Hard constraints:
 ---
 
 ## What's New
-5 bullets max. Covers all domains: model/tool releases, MLOps practice shifts, DS/ML research
+4 bullets max. Covers all domains: model/tool releases, MLOps practice shifts, DS/ML research
 crossing into production. Format: **[thing]** — signal + one decision implication.
 Skip pure marketing. Include classical ML, data engineering, LLMs, and MLOps tooling.
 
@@ -93,6 +93,14 @@ EDA failure modes, outlier handling, missing data strategies, stratified samplin
 blue-green model swap, eval regression, embedding drift, RAG retrieval quality, prompt versioning, \
 agentic loop failure modes, context window management, KV-cache reuse, inference autoscaling, \
 cost attribution, online/offline parity, reranker latency budget.
+
+## Quick Concept
+One concept from a DIFFERENT domain than the Concept of the Day above. Use this compact structure:
+- **What it is**: 1 sentence definition.
+- **Why it matters**: 1 sentence — one concrete production implication.
+- **Decision rule**: 1 sentence — a heuristic or "if X then Y" to apply immediately.
+
+The two concepts must never be from the same domain on the same day.
 
 ## Deployment Practice
 One operational pattern — something a practitioner wires up or decides during deployment or operations.
@@ -122,7 +130,7 @@ End with **Consider:** followed by 2–3 pointed hints that scaffold thinking wi
 one sentence, something concrete enough to remember and repeat.
 
 ---
-Word budget: under 520 words total.
+Word budget: under 570 words total.
 """
 
 
@@ -192,14 +200,16 @@ def synthesize_from_steps(llm, query: str, state) -> str:
     evidence = "\n\n---\n\n".join(observations)
     prompt = (
         "Write the final daily briefing from the evidence below for an MLOps and Data Science "
-        "architect who also works with GenAI/LLMs. Do not call tools. Under 520 words total. "
-        "Include exactly these four sections plus a closing Rule of Thumb line:\n"
-        "1. What's New — 5 bullets max, all domains, format: **[thing]** — signal + implication.\n"
-        "2. Concept of the Day — one concept with: What it is / How it works (example with numbers) "
-        "/ Where it silently fails / Decision rule.\n"
-        "3. Deployment Practice — one operational pattern with: Pattern / When to use it "
+        "architect who also works with GenAI/LLMs. Do not call tools. Under 570 words total. "
+        "Include exactly these five sections plus a closing Rule of Thumb line:\n"
+        "1. What's New — 4 bullets max, all domains, format: **[thing]** — signal + implication.\n"
+        "2. Concept of the Day — one concept (full depth) with: What it is / How it works "
+        "(example with numbers) / Where it silently fails / Decision rule.\n"
+        "3. Quick Concept — one concept from a DIFFERENT domain than #2, compact: "
+        "What it is / Why it matters / Decision rule (3 lines total).\n"
+        "4. Deployment Practice — one operational pattern with: Pattern / When to use it "
         "/ What breaks without it / How to implement it.\n"
-        "4. Design Challenge — system context + numeric constraint + decision + failure mode + "
+        "5. Design Challenge — system context + numeric constraint + decision + failure mode + "
         "Consider: 2–3 hints. Rotate domains across classical ML, data pipeline, MLOps, GenAI.\n"
         "End with: **Rule of Thumb:** one memorable practitioner heuristic.\n"
         "If What's New has no evidence write 'No strong signal today.' "
@@ -243,6 +253,11 @@ def fallback_report_from_steps(state, report_date: date) -> str:
 - **How it works**: A model trained on batch-aggregated features (e.g. 7-day rolling mean computed offline) receives real-time point-in-time values at inference — the two pipelines compute the same feature name but with different logic or timing windows, producing systematically different inputs. A fraud model trained on monthly average transaction velocity will underestimate risk for a new account with 3 days of history.
 - **Where it silently fails**: The model and serving pipeline both appear healthy — no errors, no latency spikes. Prediction quality degrades silently because the model has never seen the true inference-time distribution. Standard monitoring (error rate, latency, null rate) does not catch it.
 - **Decision rule**: If your training pipeline and serving pipeline compute the same feature independently, they will diverge — enforce a single feature definition served from a feature store used by both.
+
+## Quick Concept
+- **What it is**: Concept drift is the change over time in the statistical relationship between input features and the target variable a model was trained to predict.
+- **Why it matters**: A model predicting customer churn trained on pre-pandemic behaviour may silently degrade as spending patterns shift — the inputs look identical but the meaning of those patterns has changed, making staleness invisible to standard data quality checks.
+- **Decision rule**: Schedule retraining triggers on business-cycle boundaries (seasonal shifts, market events) not just on data volume — time elapsed is often a better drift proxy than rows processed.
 
 ## Deployment Practice
 - **Pattern**: Shadow deployment runs a new model version in parallel with production, receiving the same live traffic, but its outputs are logged rather than served to users.
