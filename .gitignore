@@ -13,3 +13,4 @@ research_memory.db
 chroma_db/
 *.egg-info/
 .venv/
+results/daily/*.md
