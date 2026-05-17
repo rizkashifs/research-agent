@@ -1,14 +1,17 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """Generate the daily AI research report and email the markdown file."""
 import argparse
+import logging
 import os
 import smtplib
 import sys
+import traceback
 from datetime import date
 from email.message import EmailMessage
 from html import escape
 from pathlib import Path
 import re
+from logging.handlers import RotatingFileHandler
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -31,20 +34,22 @@ from llm.factory import get_llm_client
 REPORT_SYSTEM_PROMPT_TEMPLATE = """\
 You are a senior ML educator and AI research analyst writing a daily briefing for an MLOps and \
 Data Science architect who also works with GenAI/LLMs/Agentic AI.
-Today is {report_date}. Internet search is ON — use it.
+Today is {report_date}. Internet search is ON - use it.
 
 Your job has two parts:
-1. Run 3 targeted web searches to gather today's news signals (for What's New).
-2. Write a learning-first briefing: the Concept of the Day, Deployment Practice, and Design \
-Challenge come from your deep knowledge — grounded in today's signals where relevant, but not \
-limited to them. These sections must teach something concrete and memorable every day.
+1. Run 3 targeted web searches to gather today's strategic signals: trends, investments, \
+enterprise IT news, policy shifts, and infrastructure moves.
+2. Write a learning-first briefing: the Concept of the Day, Quick Concept, Teach Me Something New, \
+Deployment Practice, and Design Challenge come from your deep knowledge - grounded in today's \
+signals where relevant, but not limited to them. These sections must teach something concrete and \
+memorable every day.
 
 Do not call recall() or save_note(). Do not call summarize() separately; synthesize inline.
 
-Search strategy — run all 3 searches in the first iteration, each with max_results=3 and timelimit="w":
-  1. "AI LLM GenAI model release tool update {report_date}"
-  2. "MLOps data science ML deployment monitoring practice {report_date}"
-  3. "machine learning research benchmark fine-tuning statistics {report_date}"
+Search strategy - run all 3 searches in the first iteration, each with max_results=3 and timelimit="w":
+  1. "AI enterprise investment cloud infrastructure policy {report_date}"
+  2. "global IT trends semiconductor software security {report_date}"
+  3. "data infrastructure MLOps AI platform strategy {report_date}"
 
 After the searches complete, write the full report in the next iteration.
 Do not add extra tool calls between the searches and the final answer.
@@ -57,31 +62,32 @@ REPORT_QUERY_TEMPLATE = """\
 Act as my Senior ML Educator and Research Lead. Today is {{Date}}.
 
 I am an MLOps and Data Science architect with focus also on GenAI/LLMs/Agentic AI.
-My primary goal is to learn something every day — conceptually and operationally.
-Staying current on news is secondary.
+My primary goal is to learn something every day - conceptually and operationally.
+Staying current on strategic news is secondary but still valuable.
 
 Hard constraints:
-- Total report UNDER 570 words. If it is long I stop reading it.
+- Total report UNDER 650 words. If it is long I stop reading it.
 - Tight bullet points, not paragraphs. No section intros, no fluff.
 - Every sentence carries a concrete signal, learning point, or decision implication.
 - Search budget: at most 3 web searches, max_results=3 each, timelimit="w".
-- If What's New has no strong signal, write: "No strong signal today."
+- If Strategic Signals has no strong signal, write: "No strong signal today."
 
 ---
 
-## What's New
-4 bullets max. Covers all domains: model/tool releases, MLOps practice shifts, DS/ML research
-crossing into production. Format: **[thing]** — signal + one decision implication.
-Skip pure marketing. Include classical ML, data engineering, LLMs, and MLOps tooling.
+## Strategic Signals
+3 bullets max. Focus on trends, investments, enterprise IT, policy, regulation, security, cloud, \
+chips, platform shifts, and operating-model changes. Format: **[thing]** - signal + one decision \
+implication.
+Skip pure product hype and narrow model-release chatter unless it changes strategy.
 
 ## Concept of the Day
 One concept chosen from the rotation below. Use this exact structure:
-- **What it is**: 1 sentence, plain definition — no jargon unless defined.
+- **What it is**: 1 sentence, plain definition - no jargon unless defined.
 - **How it works**: 2 sentences, concrete example with real numbers or a before/after scenario.
-- **Where it silently fails**: 2 sentences — specific production failure mode and why it is hard to catch.
-- **Decision rule**: 1 sentence — a threshold, heuristic, or "if X then Y" the reader can apply immediately.
+- **Where it silently fails**: 2 sentences - specific production failure mode and why it is hard to catch.
+- **Decision rule**: 1 sentence - a threshold, heuristic, or "if X then Y" the reader can apply immediately.
 
-Rotate across these three domains equally — do not favour GenAI:
+Rotate across these three domains equally - do not favour GenAI:
 - Classical ML/stats: bias-variance tradeoff, model calibration, feature leakage, data leakage, \
 train-test contamination, overfitting signals, class imbalance, A/B test design, statistical power, \
 type I/II errors, p-value traps, confidence intervals, covariate shift, concept drift, \
@@ -94,21 +100,32 @@ blue-green model swap, eval regression, embedding drift, RAG retrieval quality, 
 agentic loop failure modes, context window management, KV-cache reuse, inference autoscaling, \
 cost attribution, online/offline parity, reranker latency budget.
 
+## Teach Me Something New
+Teach one fresh concept from internal knowledge only. Do not rely on today's search results. Pick a \
+concept that is strategically useful for an ML/AI leader or builder.
+Use this exact structure:
+- **Concept**: 1 sentence definition.
+- **Why it matters**: 1 sentence - a concrete leadership, product, or systems implication.
+- **Where teams get it wrong**: 1 sentence - one realistic failure mode.
+- **Decision rule**: 1 sentence - a practical heuristic the reader can apply immediately.
+Prefer concepts from AI systems, data infrastructure, cloud economics, evaluation, security, \
+product metrics, or operating-model design rather than repeating the same core topic every day.
+
 ## Quick Concept
 One concept from a DIFFERENT domain than the Concept of the Day above. Use this compact structure:
 - **What it is**: 1 sentence definition.
-- **Why it matters**: 1 sentence — one concrete production implication.
-- **Decision rule**: 1 sentence — a heuristic or "if X then Y" to apply immediately.
+- **Why it matters**: 1 sentence - one concrete production implication.
+- **Decision rule**: 1 sentence - a heuristic or "if X then Y" to apply immediately.
 
 The two concepts must never be from the same domain on the same day.
 
 ## Deployment Practice
-One operational pattern — something a practitioner wires up or decides during deployment or operations.
+One operational pattern - something a practitioner wires up or decides during deployment or operations.
 Structure:
-- **Pattern**: 1 sentence — what it is.
-- **When to use it**: 1 sentence — the trigger condition or signal that calls for this pattern.
-- **What breaks without it**: 1 sentence — the specific, concrete failure mode.
-- **How to implement it**: 1–2 sentences — one detail that makes it work in practice (a threshold, \
+- **Pattern**: 1 sentence - what it is.
+- **When to use it**: 1 sentence - the trigger condition or signal that calls for this pattern.
+- **What breaks without it**: 1 sentence - the specific, concrete failure mode.
+- **How to implement it**: 1-2 sentences - one detail that makes it work in practice (a threshold, \
 a tool contract, a data structure, a decision rule).
 
 Rotate through: shadow deployment, canary release, blue-green model swap, model promotion gate, \
@@ -118,25 +135,26 @@ data drift alerting, experiment tracking discipline, training pipeline idempoten
 load testing ML endpoints, A/B test instrumentation, SLA definition for ML systems.
 
 ## Design Challenge
-3–4 sentences. One architecture problem. Rotate domains: classical ML system, data pipeline, \
-GenAI/LLM, MLOps infrastructure, DS workflow — do not default to LLMs.
+3-4 sentences. One architecture problem. Rotate domains: classical ML system, data pipeline, \
+GenAI/LLM, MLOps infrastructure, DS workflow - do not default to LLMs.
 State: system context + one concrete numeric constraint (latency, dataset size, cost, team size) \
 + the specific decision to make + the failure mode to defend against.
-End with **Consider:** followed by 2–3 pointed hints that scaffold thinking without giving the answer.
+End with **Consider:** followed by 2-3 pointed hints that scaffold thinking without giving the answer.
 
 ---
 
-**Rule of Thumb:** One practitioner heuristic relevant to today's concept or challenge — \
+**Rule of Thumb:** One practitioner heuristic relevant to today's concept or challenge - \
 one sentence, something concrete enough to remember and repeat.
 
 ---
-Word budget: under 570 words total.
+Word budget: under 650 words total.
 """
 
 
 HAIKU_45_INPUT_PER_MILLION = 1.00
 HAIKU_45_OUTPUT_PER_MILLION = 5.00
 INCOMPLETE_WARNING = "[Warning: answer may be incomplete"
+LOG_DIR = PROJECT_ROOT / "results" / "daily" / "logs"
 
 
 def load_yesterday_context(output_dir: Path, report_date: date) -> str:
@@ -155,7 +173,7 @@ def load_yesterday_context(output_dir: Path, report_date: date) -> str:
         return ""
     summary = "\n".join(lines[:20])
     return (
-        "IMPORTANT — Yesterday's report already covered the following topics and items. "
+        "IMPORTANT â€” Yesterday's report already covered the following topics and items. "
         "Do NOT repeat these. Find different signals today:\n"
         + summary
         + "\n\n"
@@ -200,25 +218,29 @@ def synthesize_from_steps(llm, query: str, state) -> str:
     evidence = "\n\n---\n\n".join(observations)
     prompt = (
         "Write the final daily briefing from the evidence below for an MLOps and Data Science "
-        "architect who also works with GenAI/LLMs. Do not call tools. Under 570 words total. "
-        "Include exactly these five sections plus a closing Rule of Thumb line:\n"
-        "1. What's New — 4 bullets max, all domains, format: **[thing]** — signal + implication.\n"
-        "2. Concept of the Day — one concept (full depth) with: What it is / How it works "
+        "architect who also works with GenAI/LLMs. Do not call tools. Under 650 words total. "
+        "Include exactly these six sections plus a closing Rule of Thumb line:\n"
+        "1. Strategic Signals - 3 bullets max, focused on strategic news, trends, investments, "
+        "enterprise IT, policy, regulation, security, cloud, and infrastructure. Format: **[thing]** "
+        "- signal + implication.\n"
+        "2. Concept of the Day - one concept (full depth) with: What it is / How it works "
         "(example with numbers) / Where it silently fails / Decision rule.\n"
-        "3. Quick Concept — one concept from a DIFFERENT domain than #2, compact: "
+        "3. Teach Me Something New - one fresh concept from internal knowledge only with: Concept / "
+        "Why it matters / Where teams get it wrong / Decision rule.\n"
+        "4. Quick Concept - one concept from a DIFFERENT domain than #2, compact: "
         "What it is / Why it matters / Decision rule (3 lines total).\n"
-        "4. Deployment Practice — one operational pattern with: Pattern / When to use it "
+        "5. Deployment Practice - one operational pattern with: Pattern / When to use it "
         "/ What breaks without it / How to implement it.\n"
-        "5. Design Challenge — system context + numeric constraint + decision + failure mode + "
-        "Consider: 2–3 hints. Rotate domains across classical ML, data pipeline, MLOps, GenAI.\n"
+        "6. Design Challenge - system context + numeric constraint + decision + failure mode + "
+        "Consider: 2-3 hints. Rotate domains across classical ML, data pipeline, MLOps, GenAI.\n"
         "End with: **Rule of Thumb:** one memorable practitioner heuristic.\n"
-        "If What's New has no evidence write 'No strong signal today.' "
+        "Section 3 must come from internal knowledge, not the evidence. "
+        "If Strategic Signals has no evidence write 'No strong signal today.' "
         "Every line must carry a concrete learning point or decision implication.\n\n"
         f"Evidence gathered:\n{evidence}"
     )
     response = llm.chat(messages=[{"role": "user", "content": prompt}], tools=None)
     return response.get("content", "").strip()
-
 
 def is_incomplete_report(final_answer: str, state) -> bool:
     stripped = final_answer.strip()
@@ -245,25 +267,31 @@ def fallback_report_from_steps(state, report_date: date) -> str:
     return f"""\
 # Daily AI Research Report | {report_date.isoformat()}
 
-## What's New
+## Strategic Signals
 {bullets(searches[:2] + recalls[:1])}
 
 ## Concept of the Day
 - **What it is**: Train-serve skew is the divergence between the feature distribution seen during model training and the distribution of the same features at serving time.
-- **How it works**: A model trained on batch-aggregated features (e.g. 7-day rolling mean computed offline) receives real-time point-in-time values at inference — the two pipelines compute the same feature name but with different logic or timing windows, producing systematically different inputs. A fraud model trained on monthly average transaction velocity will underestimate risk for a new account with 3 days of history.
-- **Where it silently fails**: The model and serving pipeline both appear healthy — no errors, no latency spikes. Prediction quality degrades silently because the model has never seen the true inference-time distribution. Standard monitoring (error rate, latency, null rate) does not catch it.
-- **Decision rule**: If your training pipeline and serving pipeline compute the same feature independently, they will diverge — enforce a single feature definition served from a feature store used by both.
+- **How it works**: A model trained on batch-aggregated features (e.g. 7-day rolling mean computed offline) receives real-time point-in-time values at inference - the two pipelines compute the same feature name but with different logic or timing windows, producing systematically different inputs. A fraud model trained on monthly average transaction velocity will underestimate risk for a new account with 3 days of history.
+- **Where it silently fails**: The model and serving pipeline both appear healthy - no errors, no latency spikes. Prediction quality degrades silently because the model has never seen the true inference-time distribution. Standard monitoring (error rate, latency, null rate) does not catch it.
+- **Decision rule**: If your training pipeline and serving pipeline compute the same feature independently, they will diverge - enforce a single feature definition served from a feature store used by both.
+
+## Teach Me Something New
+- **Concept**: Prompt versioning is the practice of treating prompt text, tool schemas, and routing rules as versioned production artifacts.
+- **Why it matters**: It lets you measure whether a model change or a prompt change caused a regression instead of guessing.
+- **Where teams get it wrong**: They edit prompts in place, which makes rollback, A/B testing, and incident review nearly impossible.
+- **Decision rule**: If a prompt changes behavior enough to notice in review, give it a version and a changelog.
 
 ## Quick Concept
 - **What it is**: Concept drift is the change over time in the statistical relationship between input features and the target variable a model was trained to predict.
-- **Why it matters**: A model predicting customer churn trained on pre-pandemic behaviour may silently degrade as spending patterns shift — the inputs look identical but the meaning of those patterns has changed, making staleness invisible to standard data quality checks.
-- **Decision rule**: Schedule retraining triggers on business-cycle boundaries (seasonal shifts, market events) not just on data volume — time elapsed is often a better drift proxy than rows processed.
+- **Why it matters**: A model predicting customer churn trained on pre-pandemic behaviour may silently degrade as spending patterns shift - the inputs look identical but the meaning of those patterns has changed, making staleness invisible to standard data quality checks.
+- **Decision rule**: Schedule retraining triggers on business-cycle boundaries (seasonal shifts, market events) not just on data volume - time elapsed is often a better drift proxy than rows processed.
 
 ## Deployment Practice
 - **Pattern**: Shadow deployment runs a new model version in parallel with production, receiving the same live traffic, but its outputs are logged rather than served to users.
-- **When to use it**: Before any model swap where you lack sufficient offline eval coverage of production traffic distribution — especially on skewed or long-tail inputs.
+- **When to use it**: Before any model swap where you lack sufficient offline eval coverage of production traffic distribution - especially on skewed or long-tail inputs.
 - **What breaks without it**: You discover latency regressions, edge-case failures, or cost overruns only after the model is live, when rollback is expensive and user-visible.
-- **How to implement it**: Route 100% of requests to both models; gate the shadow path behind a feature flag; compare output distributions (not just accuracy) and p99 latency over 24–48 hours before promoting.
+- **How to implement it**: Route 100% of requests to both models; gate the shadow path behind a feature flag; compare output distributions (not just accuracy) and p99 latency over 24-48 hours before promoting.
 
 ## Design Challenge
 You are deploying a new gradient-boosted model to replace a 2-year-old logistic regression on a customer churn prediction pipeline. The new model improves AUC by 6% on your holdout set (80k rows, 18 months of data). Inference runs in batch overnight. Your constraint: rollback must complete within one pipeline cycle (24 hours) and you cannot re-train within that window. The failure mode to defend against: the new model performs worse on a customer segment that is underrepresented in training data but high-value in production.
@@ -272,9 +300,8 @@ You are deploying a new gradient-boosted model to replace a 2-year-old logistic 
 
 ---
 
-**Rule of Thumb:** A 6% AUC lift on a global holdout means nothing if it comes from the majority class — always check segment-level performance before promoting a model that serves a heterogeneous population.
+**Rule of Thumb:** A 6% AUC lift on a global holdout means nothing if it comes from the majority class - always check segment-level performance before promoting a model that serves a heterogeneous population.
 """
-
 
 def generate_report(query: str, online: bool, output_dir: Path, report_date: date) -> Path:
     ltm = LongTermMemory()
@@ -507,39 +534,93 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Force execution even if a report for today already exists.",
     )
+    parser.add_argument(
+        "--log-file",
+        default="",
+        help="Optional log file path. Defaults to results/daily/logs/YYYY-MM-DD_daily_ai_research_report.log.",
+    )
     return parser.parse_args()
+
+
+def build_log_path(report_date: date, log_file: str) -> Path:
+    if log_file:
+        return Path(log_file)
+    return LOG_DIR / f"{report_date.isoformat()}_{slugify('daily ai research report')}.log"
+
+
+def setup_logging(log_path: Path) -> None:
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    root_logger.handlers.clear()
+
+    formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
+
+    file_handler = RotatingFileHandler(
+        log_path,
+        maxBytes=1_000_000,
+        backupCount=3,
+        encoding="utf-8",
+    )
+    file_handler.setFormatter(formatter)
+    root_logger.addHandler(file_handler)
+
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(formatter)
+    root_logger.addHandler(console_handler)
 
 
 def main() -> None:
     args = parse_args()
     today = date.today()
-    
+    log_path = build_log_path(today, args.log_file)
+    setup_logging(log_path)
+    logging.info("Starting daily AI research report run")
+    logging.info("Report date: %s", today.isoformat())
+    logging.info("Online mode: %s", args.online)
+    logging.info("No email: %s", args.no_email)
+    logging.info("Output dir: %s", Path(args.output_dir))
+    logging.info("Log file: %s", log_path)
+
     # Check if report already exists for today
     filename = f"{today.isoformat()}_{slugify('daily ai research report')}.md"
     output_dir = Path(args.output_dir)
     output_path = output_dir / filename
-    
+
     if output_path.exists() and not args.force:
+        logging.info("Skipping because report already exists: %s", output_path)
         print(f"[Skip] Report for today ({today.isoformat()}) already exists at: {output_path}")
         print("Use --force to generate it again.")
         return
 
-    query = build_query(today)
-    output_path = generate_report(
-        query=query,
-        online=args.online,
-        output_dir=output_dir,
-        report_date=today,
-    )
-    print(f"[Report] Saved markdown report to: {output_path}")
+    try:
+        query = build_query(today)
+        logging.info("Generating report")
+        output_path = generate_report(
+            query=query,
+            online=args.online,
+            output_dir=output_dir,
+            report_date=today,
+        )
+        logging.info("Saved markdown report to %s", output_path)
+        print(f"[Report] Saved markdown report to: {output_path}")
 
-    if args.no_email:
-        print("[Email] Skipped because --no-email was provided.")
-        return
+        if args.no_email:
+            logging.info("Email skipped because --no-email was provided")
+            print("[Email] Skipped because --no-email was provided.")
+            return
 
-    send_email(output_path, today)
-    print(f"[Email] Sent report to: {os.getenv('EMAIL_TO')}")
+        logging.info("Sending email")
+        send_email(output_path, today)
+        logging.info("Email sent successfully")
+        print(f"[Email] Sent report to: {os.getenv('EMAIL_TO')}")
+    except Exception:
+        logging.exception("Daily report run failed")
+        print(f"[Error] Daily report failed. Check log file: {log_path}")
+        print(traceback.format_exc())
+        raise
 
 
 if __name__ == "__main__":
     main()
+

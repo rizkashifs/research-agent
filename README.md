@@ -95,10 +95,11 @@ It runs a fixed Senior AI Research Lead query, saves a markdown file under
 `results/daily/`, puts the report content in the email body, and attaches the
 same `.md` file using SMTP settings from `.env`.
 
-The daily query covers GenAI Ops, MLOps Platform/Infra,
-Deployment/Release Engineering, RAG/Data Quality, Cost/Performance Engineering,
-Production Reliability/Security, one deep technical concept, and one
-architecture design challenge.
+The daily query now starts with a more strategic news section focused on trends,
+investments, enterprise IT, policy, regulation, security, cloud, chips, and
+platform shifts. It then covers a deep technical concept, a separate
+internal-knowledge teaching section, a quick concept, a deployment pattern, and
+one architecture design challenge.
 The job uses at most 3 research/tool iterations, then performs a final no-tools
 synthesis pass if needed so the email still contains a complete report.
 
@@ -139,9 +140,16 @@ Without `-Online`, the scheduled job will run in offline mode and will not
 perform web lookup.
 
 The scheduled task is configured with `StartWhenAvailable`, `WakeToRun`, and
-three retries at 60-minute intervals. If the laptop is asleep or hibernating and
-Windows can wake it, the report should run. If the laptop is fully shut down at
-11 AM, the task will run when Windows is next available.
+three retries at 60-minute intervals. It now launches
+`scripts/run_daily_report_with_logs.ps1`, which tees stdout and stderr into
+`results/daily/logs/task/YYYY-MM-DD_daily_ai_research_report_task.log`.
+
+The Python report script also writes its own run log to
+`results/daily/logs/YYYY-MM-DD_daily_ai_research_report.log`.
+
+If the laptop is asleep or hibernating and Windows can wake it, the report
+should run. If the laptop is fully shut down at 11 AM, the task will run when
+Windows is next available.
 
 ## Provider Switching
 

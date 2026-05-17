@@ -22,12 +22,21 @@ if (-not $PythonPath) {
 }
 
 $ScriptPath = Join-Path $ProjectRoot "scripts\daily_ai_research_report.py"
-$Arguments = "`"$ScriptPath`""
+$WrapperPath = Join-Path $ProjectRoot "scripts\run_daily_report_with_logs.ps1"
+$Arguments = @(
+    "-NoProfile"
+    "-ExecutionPolicy", "Bypass"
+    "-File", "`"$WrapperPath`""
+    "-ProjectRoot", "`"$ProjectRoot`""
+)
+if ($PythonPath) {
+    $Arguments += @("-PythonPath", "`"$PythonPath`"")
+}
 if ($Online) {
-    $Arguments += " --online"
+    $Arguments += "-Online"
 }
 
-$Action = New-ScheduledTaskAction -Execute $PythonPath -Argument $Arguments -WorkingDirectory $ProjectRoot
+$Action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument ($Arguments -join " ") -WorkingDirectory $ProjectRoot
 $Trigger = New-ScheduledTaskTrigger -Daily -At $Time
 $Settings = New-ScheduledTaskSettingsSet `
     -StartWhenAvailable `
@@ -49,4 +58,5 @@ Register-ScheduledTask `
 Write-Host "Registered scheduled task '$TaskName' to run daily at $Time."
 Write-Host "Project root: $ProjectRoot"
 Write-Host "Python: $PythonPath"
+Write-Host "Wrapper: $WrapperPath"
 Write-Host "Online mode: $($Online.IsPresent)"

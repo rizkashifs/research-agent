@@ -37,8 +37,9 @@ This document explains the internal architecture of the Research Agent and provi
 - **`run_eval.py`**: An automated testing script that runs the agent against predefined test cases in `test_cases.json` and scores the results.
 
 ### Automation (`scripts/`)
-- **`daily_ai_research_report.py`**: Runs the fixed daily Senior AI Research Lead query across GenAI Ops, MLOps Platform/Infra, Deployment/Release Engineering, RAG/Data Quality, Cost/Performance, Production Reliability/Security, Deep Dive, and Design Challenge sections. It saves a markdown report under `results/daily/` and emails it using SMTP settings from `.env`.
-- **`register_daily_report_task.ps1`**: Registers the daily report script as a Windows Scheduled Task. Pass `-Online` when the job should use internet search.
+- **`daily_ai_research_report.py`**: Runs the fixed daily Senior AI Research Lead query with a strategic news section, a deep concept section, a separate internal-knowledge teaching section, a quick concept, a deployment pattern, and a design challenge. It saves a markdown report under `results/daily/` and emails it using SMTP settings from `.env`.
+- **`register_daily_report_task.ps1`**: Registers the daily report pipeline as a Windows Scheduled Task. Pass `-Online` when the job should use internet search. The task now launches `run_daily_report_with_logs.ps1`, which captures the task output into `results/daily/logs/task/`.
+- **`run_daily_report_with_logs.ps1`**: Wrapper used by the scheduled task to tee stdout and stderr into a dated transcript log while invoking the Python daily report script.
 
 ---
 
@@ -84,8 +85,10 @@ The agent enters a loop (up to `MAX_ITERATIONS`):
 The daily report flow is separate from the interactive CLI:
 
 1. **`scripts/daily_ai_research_report.py`** builds the daily AI research query and replaces `{{Date}}` with today's date.
-2. It initializes the same LLM, memory, registry, and `ResearchAgent` stack used by `main.py`.
-3. It runs online only when called with `--online`; otherwise it remains offline like the main CLI.
-4. It writes the final markdown file to `results/daily/YYYY-MM-DD_daily_ai_research_report.md`.
-5. It emails that markdown file using `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `EMAIL_FROM`, and `EMAIL_TO` from `.env`.
-6. **`scripts/register_daily_report_task.ps1`** creates a Windows Scheduled Task that runs the report script every day at the configured time.
+2. It starts with a strategic news search section aimed at trends, investments, enterprise IT, policy, regulation, security, cloud, chips, and platform shifts.
+3. It then layers in a deep concept, a separate internal-knowledge teaching section, a quick concept, a deployment pattern, and a design challenge.
+4. It runs online only when called with `--online`; otherwise it remains offline like the main CLI.
+5. It writes the final markdown file to `results/daily/YYYY-MM-DD_daily_ai_research_report.md`.
+6. It writes its own run log to `results/daily/logs/YYYY-MM-DD_daily_ai_research_report.log`.
+7. It emails that markdown file using `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `EMAIL_FROM`, and `EMAIL_TO` from `.env`.
+8. **`scripts/register_daily_report_task.ps1`** creates a Windows Scheduled Task that runs the report pipeline every day at the configured time through `scripts/run_daily_report_with_logs.ps1`.
